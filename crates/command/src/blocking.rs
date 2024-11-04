@@ -19,6 +19,6 @@ impl Command {
             inner
         }
         #[cfg(not(windows))]
-        std::process::Command::new(program);
+        std::process::Command::new(program)
     }
 }
