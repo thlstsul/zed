@@ -6,9 +6,14 @@ pub use lsp_types::*;
 use anyhow::{anyhow, Context, Result};
 use collections::HashMap;
 use futures::{channel::oneshot, io::BufWriter, select, AsyncRead, AsyncWrite, Future, FutureExt};
-use gpui::{AppContext, AsyncAppContext, BackgroundExecutor, Task};
+use gpui::{AppContext, AsyncAppContext, BackgroundExecutor, SharedString, Task};
 use parking_lot::{Mutex, RwLock};
 use postage::{barrier, prelude::Stream};
+use schemars::{
+    gen::SchemaGenerator,
+    schema::{InstanceType, Schema, SchemaObject},
+    JsonSchema,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, value::RawValue, Value};
 use smol::{
@@ -18,7 +23,7 @@ use smol::{
 };
 
 use std::{
-    ffi::OsString,
+    ffi::{OsStr, OsString},
     fmt,
     io::Write,
     ops::DerefMut,
@@ -75,7 +80,8 @@ pub struct LanguageServer {
     server_id: LanguageServerId,
     next_id: AtomicI32,
     outbound_tx: channel::Sender<String>,
-    name: Arc<str>,
+    name: LanguageServerName,
+    process_name: Arc<str>,
     capabilities: RwLock<ServerCapabilities>,
     code_action_kinds: Option<Vec<CodeActionKind>>,
     notification_handlers: Arc<Mutex<HashMap<&'static str, NotificationHandler>>>,
@@ -102,6 +108,58 @@ impl LanguageServerId {
 
     pub fn to_proto(self) -> u64 {
         self.0 as u64
+    }
+}
+
+/// A name of a language server.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
+pub struct LanguageServerName(pub SharedString);
+
+impl std::fmt::Display for LanguageServerName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl AsRef<str> for LanguageServerName {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+impl AsRef<OsStr> for LanguageServerName {
+    fn as_ref(&self) -> &OsStr {
+        self.0.as_ref().as_ref()
+    }
+}
+
+impl JsonSchema for LanguageServerName {
+    fn schema_name() -> String {
+        "LanguageServerName".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+impl LanguageServerName {
+    pub const fn new_static(s: &'static str) -> Self {
+        Self(SharedString::new_static(s))
+    }
+
+    pub fn from_proto(s: String) -> Self {
+        Self(s.into())
+    }
+}
+
+impl<'a> From<&'a str> for LanguageServerName {
+    fn from(str: &'a str) -> LanguageServerName {
+        LanguageServerName(str.to_string().into())
     }
 }
 
@@ -266,6 +324,7 @@ impl LanguageServer {
     pub fn new(
         stderr_capture: Arc<Mutex<Option<String>>>,
         server_id: LanguageServerId,
+        server_name: LanguageServerName,
         binary: LanguageServerBinary,
         root_path: &Path,
         code_action_kinds: Option<Vec<CodeActionKind>>,
@@ -305,6 +364,7 @@ impl LanguageServer {
         let stderr = server.stderr.take().unwrap();
         let mut server = Self::new_internal(
             server_id,
+            server_name,
             stdin,
             stdout,
             Some(stderr),
@@ -325,7 +385,7 @@ impl LanguageServer {
         );
 
         if let Some(name) = binary.path.file_name() {
-            server.name = name.to_string_lossy().into();
+            server.process_name = name.to_string_lossy().into();
         }
 
         Ok(server)
@@ -334,6 +394,7 @@ impl LanguageServer {
     #[allow(clippy::too_many_arguments)]
     fn new_internal<Stdin, Stdout, Stderr, F>(
         server_id: LanguageServerId,
+        server_name: LanguageServerName,
         stdin: Stdin,
         stdout: Stdout,
         stderr: Option<Stderr>,
@@ -403,7 +464,8 @@ impl LanguageServer {
             notification_handlers,
             response_handlers,
             io_handlers,
-            name: Arc::default(),
+            name: server_name,
+            process_name: Arc::default(),
             capabilities: Default::default(),
             code_action_kinds,
             next_id: Default::default(),
@@ -720,7 +782,7 @@ impl LanguageServer {
         cx.spawn(|_| async move {
             let response = self.request::<request::Initialize>(params).await?;
             if let Some(info) = response.server_info {
-                self.name = info.name.into();
+                self.process_name = info.name.into();
             }
             self.capabilities = RwLock::new(response.capabilities);
 
@@ -932,8 +994,12 @@ impl LanguageServer {
     }
 
     /// Get the name of the running language server.
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> LanguageServerName {
+        self.name.clone()
+    }
+
+    pub fn process_name(&self) -> &str {
+        &self.process_name
     }
 
     /// Get the reported capabilities of the running language server.
@@ -1174,8 +1240,11 @@ impl FakeLanguageServer {
 
         let root = Self::root_path();
 
+        let server_name = LanguageServerName(name.clone().into());
+        let process_name = Arc::from(name.as_str());
         let mut server = LanguageServer::new_internal(
             server_id,
+            server_name.clone(),
             stdin_writer,
             stdout_reader,
             None::<async_pipe::PipeReader>,
@@ -1187,12 +1256,13 @@ impl FakeLanguageServer {
             cx.clone(),
             |_| {},
         );
-        server.name = name.as_str().into();
+        server.process_name = process_name;
         let fake = FakeLanguageServer {
             binary,
             server: Arc::new({
                 let mut server = LanguageServer::new_internal(
                     server_id,
+                    server_name,
                     stdout_writer,
                     stdin_reader,
                     None::<async_pipe::PipeReader>,
@@ -1211,7 +1281,7 @@ impl FakeLanguageServer {
                             .ok();
                     },
                 );
-                server.name = name.as_str().into();
+                server.process_name = name.as_str().into();
                 server
             }),
             notifications_rx,

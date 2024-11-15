@@ -4,7 +4,7 @@ use futures::StreamExt;
 use gpui::AsyncAppContext;
 use http_client::github::{latest_github_release, GitHubLspBinaryVersion};
 pub use language::*;
-use lsp::LanguageServerBinary;
+use lsp::{LanguageServerBinary, LanguageServerName};
 use command::Command;
 use smol::fs::{self, File};
 use std::{any::Any, env::consts, path::PathBuf, sync::Arc};

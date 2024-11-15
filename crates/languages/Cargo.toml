@@ -48,6 +48,7 @@ node_runtime.workspace = true
 command.workspace = true
 paths.workspace = true
 pet.workspace = true
+pet-fs.workspace = true
 pet-core.workspace = true
 pet-conda.workspace = true
 pet-poetry.workspace = true

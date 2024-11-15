@@ -29,10 +29,26 @@ Extensions that provide language servers may also provide default settings for t
 
 # Settings
 
-## Active Pane Magnification
+## Active Pane Modifiers
+
+Styling settings applied to the active pane.
+
+### Magnification
 
 - Description: Scale by which to zoom the active pane. When set to `1.0`, the active pane has the same size as others, but when set to a larger value, the active pane takes up more space.
-- Setting: `active_pane_magnification`
+- Setting: `magnification`
+- Default: `1.0`
+
+### Border size
+
+- Description: Size of the border surrounding the active pane. When set to 0, the active pane doesn't have any border. The border is drawn inset.
+- Setting: `border_size`
+- Default: `0.0`
+
+### Inactive Opacity
+
+- Description: Opacity of inactive panels. When set to 1.0, the inactive panes have the same opacity as the active one. If set to 0, the inactive panes content will not be visible at all. Values are clamped to the [0.0, 1.0] range.
+- Setting: `inactive_opacity`
 - Default: `1.0`
 
 **Options**
@@ -342,6 +358,40 @@ There are two options to choose from:
 **Options**
 
 List of `string` values
+
+## Inline Completions Disabled in
+
+- Description: A list of language scopes in which inline completions should be disabled.
+- Setting: `inline_completions_disabled_in`
+- Default: `[]`
+
+**Options**
+
+List of `string` values
+
+1. Don't show inline completions in comments:
+
+```json
+"disabled_in": ["comment"]
+```
+
+2. Don't show inline completions in strings and comments:
+
+```json
+"disabled_in": ["comment", "string"]
+```
+
+3. Only in Go, don't show inline completions in strings and comments:
+
+```json
+{
+  "languages": {
+    "Go": {
+      "inline_completions_disabled_in": ["comment", "string"]
+    }
+  }
+}
+```
 
 ## Current Line Highlight
 
@@ -774,6 +824,8 @@ While other options may be changed at a runtime and should be placed under `sett
 ```
 
 3. External formatters may optionally include a `{buffer_path}` placeholder which at runtime will include the path of the buffer being formatted. Formatters operate by receiving file content via standard input, reformatting it and then outputting it to standard output and so normally don't know the filename of what they are formatting. Tools like prettier support receiving the file path via a command line argument which can then used to impact formatting decisions.
+
+WARNING: `{buffer_path}` should not be used to direct your formatter to read from a filename. Your formatter should only read from standard input and should not read or write files directly.
 
 ```json
   "formatter": {
