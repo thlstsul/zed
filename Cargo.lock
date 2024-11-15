@@ -5809,6 +5809,7 @@ dependencies = [
  "gpui",
  "project",
  "settings",
+ "theme",
  "ui",
  "workspace",
 ]
