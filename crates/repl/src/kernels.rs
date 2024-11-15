@@ -1,4 +1,5 @@
 use anyhow::{Context as _, Result};
+use command::Command;
 use futures::{
     channel::mpsc::{self, Receiver},
     future::Shared,
@@ -12,7 +13,7 @@ use runtimelib::{
     dirs, ConnectionInfo, ExecutionState, JupyterKernelspec, JupyterMessage, JupyterMessageContent,
     KernelInfoReply,
 };
-use smol::{net::TcpListener, process::Command};
+use smol::net::TcpListener;
 use std::{
     env,
     fmt::Debug,
@@ -98,7 +99,7 @@ impl Eq for RemoteKernelSpecification {}
 
 impl LocalKernelSpecification {
     #[must_use]
-    fn command(&self, connection_path: &PathBuf) -> Result<Command> {
+    fn command(&self, connection_path: &PathBuf) -> Result<smol::process::Command> {
         let argv = &self.kernelspec.argv;
 
         anyhow::ensure!(!argv.is_empty(), "Empty argv in kernelspec {}", self.name);
@@ -121,12 +122,6 @@ impl LocalKernelSpecification {
 
         if let Some(env) = &self.kernelspec.env {
             cmd.envs(env);
-        }
-
-        #[cfg(windows)]
-        {
-            use smol::process::windows::CommandExt;
-            cmd.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
         }
 
         Ok(cmd)
@@ -547,13 +542,6 @@ pub async fn local_kernel_specifications(fs: Arc<dyn Fs>) -> Result<Vec<LocalKer
     let mut command = Command::new("python");
     command.arg("-c");
     command.arg("import sys; print(sys.prefix)");
-
-    #[cfg(windows)]
-    {
-        use smol::process::windows::CommandExt;
-        command.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
-    }
-
     let command = command.output().await;
 
     if let Ok(command) = command {

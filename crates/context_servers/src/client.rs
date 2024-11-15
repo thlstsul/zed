@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use collections::HashMap;
+use command::Command;
 use futures::{channel::oneshot, io::BufWriter, select, AsyncRead, AsyncWrite, FutureExt};
 use gpui::{AsyncAppContext, BackgroundExecutor, Task};
 use parking_lot::Mutex;
@@ -9,7 +10,7 @@ use serde_json::{value::RawValue, Value};
 use smol::{
     channel,
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    process::{self, Child},
+    process::Child,
 };
 use std::{
     fmt,
@@ -152,7 +153,7 @@ impl Client {
             &binary.args
         );
 
-        let mut command = process::Command::new(&binary.executable);
+        let mut command = Command::new(&binary.executable);
         command
             .args(&binary.args)
             .envs(binary.env.unwrap_or_default())

@@ -2828,6 +2828,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "collections",
+ "command",
  "command_palette_hooks",
  "futures 0.3.30",
  "gpui",
@@ -9716,6 +9717,7 @@ dependencies = [
  "base64 0.22.1",
  "client",
  "collections",
+ "command",
  "command_palette_hooks",
  "editor",
  "env_logger 0.11.5",

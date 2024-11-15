@@ -4,9 +4,6 @@ use collections::HashMap;
 use command::blocking::Command;
 use std::path::Path;
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
 pub fn get_messages(working_directory: &Path, shas: &[Oid]) -> Result<HashMap<Oid, String>> {
     if shas.is_empty() {
         return Ok(HashMap::default());
@@ -22,9 +19,6 @@ pub fn get_messages(working_directory: &Path, shas: &[Oid]) -> Result<HashMap<Oi
         .arg("-s")
         .arg(format!("--format=%B{}", MARKER))
         .args(shas.iter().map(ToString::to_string));
-
-    #[cfg(windows)]
-    command.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
 
     let output = command
         .output()

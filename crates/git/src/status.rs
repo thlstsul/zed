@@ -40,12 +40,6 @@ impl GitStatus {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            child.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
-        }
-
         let child = child
             .spawn()
             .map_err(|e| anyhow!("Failed to start git status process: {}", e))?;

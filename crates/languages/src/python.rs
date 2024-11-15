@@ -2,6 +2,7 @@ use anyhow::ensure;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use collections::HashMap;
+use command::Command;
 use gpui::AsyncAppContext;
 use gpui::{AppContext, Task};
 use language::LanguageName;
@@ -18,7 +19,7 @@ use pet_core::python_environment::PythonEnvironmentKind;
 use pet_core::Configuration;
 use project::lsp_store::language_server_settings;
 use serde_json::{json, Value};
-use smol::{lock::OnceCell, process::Command};
+use smol::lock::OnceCell;
 use std::cmp::Ordering;
 
 use std::sync::Mutex;

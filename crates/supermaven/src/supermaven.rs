@@ -278,12 +278,6 @@ impl SupermavenAgent {
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
-        #[cfg(target_os = "windows")]
-        {
-            use smol::process::windows::CommandExt;
-            process.creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
-        }
-
         let mut process = process.spawn().context("failed to start the binary")?;
 
         let stdin = process
